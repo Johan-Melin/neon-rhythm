@@ -13,6 +13,13 @@ class Game {
         this.distance = 0; // Distance traveled
         this.isPaused = false;
         
+        // Camera properties
+        this.cameraMode = 'follow'; // 'follow' or 'free'
+        this.cameraOffset = new THREE.Vector3(0, 5, 10); // Offset behind and above player
+        this.cameraLerpFactor = 0.1; // For smooth camera movement
+        this.currentCameraPosition = new THREE.Vector3();
+        this.currentCameraLookAt = new THREE.Vector3();
+        
         this.initialize();
     }
     
@@ -25,10 +32,6 @@ class Game {
         // Set up initial camera position
         this.camera.position.set(0, 10, 30); // Lower and closer to see the player
         this.camera.lookAt(0, 0, -20);
-        
-        // Camera settings
-        this.cameraMode = 'follow'; // 'follow' or 'free'
-        this.cameraOffset = new THREE.Vector3(0, 5, 10); // Offset behind and above player
         
         // Initialize track - Pass the scene
         this.track = new Track(this.scene);
@@ -59,69 +62,96 @@ class Game {
     }
     
     createHUD() {
-        // Create a container for the HUD
-        const hudContainer = document.createElement('div');
-        hudContainer.id = 'hud-container';
-        hudContainer.style.position = 'absolute';
-        hudContainer.style.top = '10px';
-        hudContainer.style.left = '10px';
-        hudContainer.style.padding = '10px';
-        hudContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        hudContainer.style.color = '#fff';
-        hudContainer.style.fontFamily = 'Arial, sans-serif';
-        hudContainer.style.borderRadius = '5px';
-        document.body.appendChild(hudContainer);
+        // Container for HUD elements
+        this.hudContainer = document.createElement('div');
+        this.hudContainer.style.position = 'absolute';
+        this.hudContainer.style.top = '10px';
+        this.hudContainer.style.left = '10px';
+        this.hudContainer.style.color = 'white';
+        this.hudContainer.style.fontFamily = 'Arial, sans-serif';
+        this.hudContainer.style.fontSize = '14px';
+        this.hudContainer.style.textShadow = '1px 1px 2px black';
+        document.body.appendChild(this.hudContainer);
         
-        // Create the distance display
+        // Distance display
         this.distanceDisplay = document.createElement('div');
         this.distanceDisplay.textContent = 'Distance: 0m';
-        hudContainer.appendChild(this.distanceDisplay);
+        this.distanceDisplay.style.marginBottom = '5px';
+        this.hudContainer.appendChild(this.distanceDisplay);
         
-        // Create the speed display
+        // Speed display
         this.speedDisplay = document.createElement('div');
-        this.speedDisplay.textContent = 'Speed: 1.0x';
-        hudContainer.appendChild(this.speedDisplay);
+        this.speedDisplay.textContent = `Speed: ${this.gameSpeed.toFixed(1)}x`;
+        this.speedDisplay.style.marginBottom = '5px';
+        this.hudContainer.appendChild(this.speedDisplay);
         
-        // Create track info display
+        // Track info
         this.trackInfoDisplay = document.createElement('div');
-        if (this.track && this.track.controlPoints) {
-            this.trackInfoDisplay.textContent = `Track Points: ${this.track.controlPoints.length}`;
-        } else {
-            this.trackInfoDisplay.textContent = 'Track: Loading...';
-        }
-        hudContainer.appendChild(this.trackInfoDisplay);
+        this.trackInfoDisplay.textContent = 'Track Points: Loading...';
+        this.trackInfoDisplay.style.marginBottom = '5px';
+        this.hudContainer.appendChild(this.trackInfoDisplay);
         
-        // Add camera position display
+        // Lateral position display
+        this.lateralDisplay = document.createElement('div');
+        this.lateralDisplay.textContent = 'Position: Center';
+        this.lateralDisplay.style.marginBottom = '5px';
+        this.hudContainer.appendChild(this.lateralDisplay);
+        
+        // Camera position
         this.cameraInfoDisplay = document.createElement('div');
-        this.updateCameraInfo();
-        hudContainer.appendChild(this.cameraInfoDisplay);
+        this.cameraInfoDisplay.textContent = 'Camera: 0, 0, 0';
+        this.cameraInfoDisplay.style.marginBottom = '5px';
+        this.hudContainer.appendChild(this.cameraInfoDisplay);
         
-        // Add help text
+        // Camera mode display
+        this.cameraModeDisplay = document.createElement('div');
+        this.cameraModeDisplay.textContent = 'Camera Mode: Follow';
+        this.cameraModeDisplay.style.marginBottom = '5px';
+        this.hudContainer.appendChild(this.cameraModeDisplay);
+        
+        // Help container
         const helpContainer = document.createElement('div');
-        helpContainer.id = 'help-container';
         helpContainer.style.position = 'absolute';
         helpContainer.style.bottom = '10px';
         helpContainer.style.left = '10px';
-        helpContainer.style.padding = '10px';
-        helpContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        helpContainer.style.color = '#fff';
+        helpContainer.style.color = 'white';
         helpContainer.style.fontFamily = 'Arial, sans-serif';
-        helpContainer.style.borderRadius = '5px';
+        helpContainer.style.fontSize = '12px';
+        helpContainer.style.textShadow = '1px 1px 2px black';
+        helpContainer.innerHTML = `
+            Controls:<br>
+            A/D or ←/→: Steer left/right<br>
+            W/S or ↑/↓: Increase/decrease speed<br>
+            SPACE: Generate new track<br>
+            C: Toggle camera mode (follow/free)<br>
+            Free camera: Q/E (left/right), R/F (up/down), T/G (fwd/back)
+        `;
         document.body.appendChild(helpContainer);
         
-        helpContainer.innerHTML = `
-            <h3>Camera Controls:</h3>
-            <p>Q/E: Move Left/Right</p>
-            <p>R/F: Move Up/Down</p>
-            <p>T/G: Move Forward/Back</p>
-            <p>Press Space to generate a new track</p>
-        `;
+        // Update track info if track exists
+        if (this.track) {
+            this.trackInfoDisplay.textContent = `Track Points: ${this.track.controlPoints.length}`;
+        }
     }
     
     updateCameraInfo() {
         if (this.cameraInfoDisplay) {
             const pos = this.camera.position;
-            this.cameraInfoDisplay.textContent = `Camera: X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`;
+            this.cameraInfoDisplay.textContent = `Camera: ${Math.round(pos.x)}, ${Math.round(pos.y)}, ${Math.round(pos.z)}`;
+        }
+        
+        if (this.cameraModeDisplay) {
+            this.cameraModeDisplay.textContent = `Camera Mode: ${this.cameraMode.charAt(0).toUpperCase() + this.cameraMode.slice(1)}`;
+        }
+        
+        if (this.lateralDisplay && this.player) {
+            let positionText = 'Center';
+            const lateralPos = this.player.lateralPosition;
+            
+            if (lateralPos < -0.2) positionText = 'Left';
+            else if (lateralPos > 0.2) positionText = 'Right';
+            
+            this.lateralDisplay.textContent = `Position: ${positionText} (${lateralPos.toFixed(2)})`;
         }
     }
     
@@ -133,13 +163,13 @@ class Game {
                 case 'w':
                 case 'W':
                     // Increase speed
-                    this.gameSpeed = Math.min(2.0, this.gameSpeed + 0.1);
+                    this.gameSpeed = Math.min(2.5, this.gameSpeed + 0.1);
                     break;
                 case 'ArrowDown':
                 case 's':
                 case 'S':
                     // Decrease speed
-                    this.gameSpeed = Math.max(0.5, this.gameSpeed - 0.1);
+                    this.gameSpeed = Math.max(0.3, this.gameSpeed - 0.1);
                     break;
                 case ' ': // Spacebar
                     // Generate a new random track
@@ -226,6 +256,9 @@ class Game {
             this.distance = this.player.update(this.gameSpeed);
             this.distanceDisplay.textContent = `Distance: ${Math.floor(this.distance)}m`;
             
+            // Update lateral position display
+            this.updateCameraInfo();
+            
             // Update camera if in follow mode
             if (this.cameraMode === 'follow') {
                 this.updateFollowCamera();
@@ -255,14 +288,33 @@ class Game {
         );
         offsetVector.applyEuler(playerRotation);
         
-        // Set camera position
-        this.camera.position.copy(playerPos).add(offsetVector);
+        // Calculate target camera position
+        const targetCameraPos = playerPos.clone().add(offsetVector);
         
         // Look at a point ahead of the player
-        const lookAtVector = new THREE.Vector3(0, 0, -5);
+        const lookAheadDistance = 10; // Look further ahead for smoother experience
+        const lookAtVector = new THREE.Vector3(0, 0, -lookAheadDistance);
         lookAtVector.applyEuler(playerRotation);
-        const lookAtPos = playerPos.clone().add(lookAtVector);
-        this.camera.lookAt(lookAtPos);
+        const targetLookAt = playerPos.clone().add(lookAtVector);
+        
+        // If we don't have initial positions, set them directly
+        if (!this.currentCameraPosition.lengthSq()) {
+            this.currentCameraPosition.copy(targetCameraPos);
+            this.currentCameraLookAt.copy(targetLookAt);
+        } else {
+            // Smoothly interpolate camera position
+            this.currentCameraPosition.lerp(targetCameraPos, this.cameraLerpFactor);
+            this.currentCameraLookAt.lerp(targetLookAt, this.cameraLerpFactor);
+        }
+        
+        // Set camera position and look at point
+        this.camera.position.copy(this.currentCameraPosition);
+        this.camera.lookAt(this.currentCameraLookAt);
+        
+        // Add a subtle camera shake/bob based on speed
+        const shakeAmount = 0.03 * this.gameSpeed;
+        this.camera.position.y += Math.sin(this.distance * 0.3) * shakeAmount;
+        this.camera.position.x += Math.sin(this.distance * 0.5) * shakeAmount * 0.5;
     }
     
     render() {

@@ -22,6 +22,13 @@ export default class Player {
         this.lateralPosition = 0; // Left/right position on the track (-1 to 1)
         this.maxLateralPosition = 0.8; // How far from center player can move
         
+        // Turning properties for smooth transitions
+        this.turnAmount = 0; // Current turn amount (-1 to 1)
+        this.maxTurnAmount = 0.5; // Max turn amount
+        this.turnDamping = 0.92; // Damping factor for smooth turn recentering
+        this.steeringAngle = 0; // Current steering wheel angle
+        this.maxSteeringAngle = Math.PI / 4; // Maximum steering angle (45 degrees)
+        
         // Control state
         this.keys = {
             left: false,
@@ -149,19 +156,34 @@ export default class Player {
             [0.75, -0.2, 0.8]    // Back right
         ];
         
+        // Store wheel references for rotation
+        this.wheels = [];
+        this.frontWheels = [];
+        
         // Create wheels with rims
         wheelPositions.forEach((position, index) => {
+            // Create wheel group for independent rotation
+            const wheelGroup = new THREE.Group();
+            wheelGroup.position.set(...position);
+            this.mesh.add(wheelGroup);
+            
             // Wheel
             const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-            wheel.position.set(...position);
-            this.mesh.add(wheel);
+            wheelGroup.add(wheel);
             
             // Rim
             const rimGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.26, 8);
             rimGeometry.rotateX(Math.PI / 2);
             const rim = new THREE.Mesh(rimGeometry, rimMaterial);
-            rim.position.set(...position);
-            this.mesh.add(rim);
+            wheelGroup.add(rim);
+            
+            // Store references
+            this.wheels.push(wheelGroup);
+            
+            // Store front wheels separately for steering
+            if (index < 2) {
+                this.frontWheels.push(wheelGroup);
+            }
         });
     }
     
@@ -280,14 +302,30 @@ export default class Player {
     }
     
     update(gameSpeed) {
-        // Update player lateral position based on input
+        // Update turn amount based on input
+        const turnRate = 0.08; // How quickly we turn
+        
         if (this.keys.left) {
-            this.lateralPosition = Math.max(-this.maxLateralPosition, this.lateralPosition - 0.03);
+            // Smoothly increase turn amount when key is pressed
+            this.turnAmount = Math.max(-this.maxTurnAmount, this.turnAmount - turnRate);
+        } else if (this.keys.right) {
+            // Smoothly increase turn amount when key is pressed
+            this.turnAmount = Math.min(this.maxTurnAmount, this.turnAmount + turnRate);
+        } else {
+            // Gradually return to center when no keys are pressed
+            this.turnAmount *= this.turnDamping;
+            
+            // Snap to zero if very small to avoid floating point issues
+            if (Math.abs(this.turnAmount) < 0.001) this.turnAmount = 0;
         }
         
-        if (this.keys.right) {
-            this.lateralPosition = Math.min(this.maxLateralPosition, this.lateralPosition + 0.03);
-        }
+        // Update lateral position based on current turn amount
+        this.lateralPosition = Math.max(-this.maxLateralPosition, 
+                                Math.min(this.maxLateralPosition, 
+                                this.lateralPosition + this.turnAmount * 0.03));
+        
+        // Update wheel rotations
+        this.updateWheelRotations(gameSpeed);
         
         // Update trackTime based on speed and road length
         this.trackTime += 0.0005 * gameSpeed;
@@ -304,6 +342,26 @@ export default class Player {
         this.distance = this.trackTime * this.track.curve.getLength();
         
         return this.distance;
+    }
+    
+    updateWheelRotations(gameSpeed) {
+        // Calculate wheel rotation speed based on game speed
+        const rotationSpeed = 0.2 * gameSpeed;
+        
+        // Rotate all wheels to simulate forward motion
+        this.wheels.forEach(wheel => {
+            wheel.rotation.x += rotationSpeed;
+        });
+        
+        // Calculate steering angle based on turn amount
+        this.steeringAngle = this.turnAmount * this.maxSteeringAngle;
+        
+        // Apply steering angle to front wheels only
+        this.frontWheels.forEach(wheel => {
+            wheel.rotation.y = -this.steeringAngle;
+            wheel.rotation.x = this.steeringAngle;
+
+        });
     }
     
     updatePositionOnTrack() {
@@ -341,8 +399,9 @@ export default class Player {
         // Position slightly above the road
         offsetPosition.add(up.clone().multiplyScalar(0.5));
         
-        // Update player position
-        this.mesh.position.copy(offsetPosition);
+        // Update player position - with subtle bounce effect
+        const bounceHeight = Math.sin(this.distance * 0.5) * 0.05; // Subtle bounce based on distance
+        this.mesh.position.copy(offsetPosition).add(new THREE.Vector3(0, bounceHeight, 0));
         
         // Create a rotation matrix from the calculated basis vectors
         // Car's coordinate system: Z forward, X right, Y up
@@ -355,5 +414,9 @@ export default class Player {
         
         // Apply rotation to player
         this.mesh.setRotationFromMatrix(matrix);
+        
+        // Add a gradual tilt based on turn amount (instead of instant tilt)
+        // This smooths out the tilting effect
+        this.mesh.rotateY(-this.turnAmount * 0.3);
     }
 } 

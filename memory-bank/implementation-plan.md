@@ -9,8 +9,6 @@ Confirm the folder structure: src/scenes, src/objects, src/utils, src/game, asse
 
 Step 2: Create the Main Game File
 Instructions:
-In src/game, create a file named game.js.
-Import Three.js into game.js.
 Set up a basic Three.js scene, perspective camera, and WebGL renderer.
 Create a render loop using requestAnimationFrame to continuously render the scene.
 Link the renderer to the index.html file by appending it to the DOM.

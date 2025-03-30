@@ -15,7 +15,10 @@ export default class Track {
         // Create the spline from control points
         this.createSpline();
         
-        // Visualize the spline with a line
+        // Create the actual road geometry
+        this.createRoadGeometry();
+        
+        // Visualize the spline with a line (for debugging)
         this.visualizeSpline();
     }
     
@@ -117,6 +120,272 @@ export default class Track {
         // Create a Catmull-Rom spline that passes through all control points
         this.curve = new THREE.CatmullRomCurve3(this.controlPoints);
         this.curve.closed = false; // Open-ended curve (not a loop)
+    }
+    
+    /**
+     * Creates the actual road geometry along the spline
+     */
+    createRoadGeometry() {
+        // Number of segments to divide the road into
+        const roadSegments = 200;
+        
+        // Get evenly spaced points along the curve
+        const points = this.curve.getPoints(roadSegments);
+        
+        // Create a group to hold all road segments
+        this.roadGroup = new THREE.Group();
+        this.group.add(this.roadGroup);
+        
+        // Create material for the road surface
+        const roadMaterial = new THREE.MeshStandardMaterial({
+            color: 0x333333, // Dark gray asphalt
+            roughness: 0.8,
+            metalness: 0.1,
+            side: THREE.DoubleSide
+        });
+        
+        // Create road mesh by generating segments between each pair of points
+        for (let i = 0; i < points.length - 1; i++) {
+            const roadSegment = this.createRoadSegment(points[i], points[i + 1], roadMaterial);
+            this.roadGroup.add(roadSegment);
+        }
+        
+        // Add road markings
+        this.addRoadMarkings(points);
+        
+        // Add side barriers
+        this.addSideBarriers(points);
+    }
+    
+    /**
+     * Creates a single road segment between two points
+     */
+    createRoadSegment(p1, p2, material) {
+        // Get direction vector between the points
+        const direction = new THREE.Vector3().subVectors(p2, p1);
+        const length = direction.length();
+        direction.normalize();
+        
+        // Calculate the perpendicular vector for road width
+        // First get world up vector
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        
+        // Calculate the right vector (perpendicular to direction and up)
+        const right = new THREE.Vector3().crossVectors(direction, worldUp).normalize();
+        
+        // Recalculate a true up vector perpendicular to both
+        const up = new THREE.Vector3().crossVectors(right, direction).normalize();
+        
+        // Create vertices for the road segment (a flat plane)
+        const halfWidth = this.width / 2;
+        
+        // Define the four corners of the road segment
+        const v1 = new THREE.Vector3().copy(p1).add(right.clone().multiplyScalar(-halfWidth)); // Back left
+        const v2 = new THREE.Vector3().copy(p1).add(right.clone().multiplyScalar(halfWidth));  // Back right
+        const v3 = new THREE.Vector3().copy(p2).add(right.clone().multiplyScalar(-halfWidth)); // Front left
+        const v4 = new THREE.Vector3().copy(p2).add(right.clone().multiplyScalar(halfWidth));  // Front right
+        
+        // Create geometry from vertices
+        const geometry = new THREE.BufferGeometry();
+        
+        // Define vertices
+        const vertices = new Float32Array([
+            // First triangle (back-left, back-right, front-left)
+            v1.x, v1.y, v1.z,
+            v2.x, v2.y, v2.z,
+            v3.x, v3.y, v3.z,
+            
+            // Second triangle (back-right, front-right, front-left)
+            v2.x, v2.y, v2.z,
+            v4.x, v4.y, v4.z,
+            v3.x, v3.y, v3.z
+        ]);
+        
+        // Define normals (all pointing up)
+        const normals = new Float32Array([
+            up.x, up.y, up.z,
+            up.x, up.y, up.z,
+            up.x, up.y, up.z,
+            
+            up.x, up.y, up.z,
+            up.x, up.y, up.z,
+            up.x, up.y, up.z
+        ]);
+        
+        // Define UVs for texture mapping
+        const uvs = new Float32Array([
+            0, 0,
+            1, 0,
+            0, 1,
+            
+            1, 0,
+            1, 1,
+            0, 1
+        ]);
+        
+        // Set attributes
+        geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+        geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        
+        // Create the mesh
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        return mesh;
+    }
+    
+    /**
+     * Adds road markings (center line and edge lines)
+     */
+    addRoadMarkings(points) {
+        // Create material for road markings
+        const centerLineMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF }); // White
+        const edgeLineMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });  // White
+        
+        // Create markings every few segments
+        const markingInterval = 4; // Every 4th point gets a marking
+        
+        for (let i = 0; i < points.length - 1; i += markingInterval) {
+            const p1 = points[i];
+            const p2 = points[Math.min(i + markingInterval/2, points.length - 1)]; // Use half the interval for marking length
+            
+            // Create center line
+            this.addRoadMarking(p1, p2, 0, 0.2, centerLineMaterial); // Center line (0 offset, 0.2 width)
+            
+            // Create edge lines
+            const edgeOffset = this.width / 2 - 0.3; // 0.3 units from the edge
+            this.addRoadMarking(p1, p2, -edgeOffset, 0.15, edgeLineMaterial); // Left edge
+            this.addRoadMarking(p1, p2, edgeOffset, 0.15, edgeLineMaterial);  // Right edge
+        }
+    }
+    
+    /**
+     * Adds a road marking line between two points
+     */
+    addRoadMarking(p1, p2, offset, width, material) {
+        // Get direction vector between the points
+        const direction = new THREE.Vector3().subVectors(p2, p1);
+        const length = direction.length();
+        direction.normalize();
+        
+        // Calculate the perpendicular vector for road width
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(direction, worldUp).normalize();
+        
+        // Offset the marking from center
+        const offsetVector = right.clone().multiplyScalar(offset);
+        
+        // Define the line corners with offset
+        const halfWidth = width / 2;
+        const offsetRight = right.clone().multiplyScalar(halfWidth);
+        
+        const v1 = new THREE.Vector3().copy(p1).add(offsetVector).sub(offsetRight);  // Back left
+        const v2 = new THREE.Vector3().copy(p1).add(offsetVector).add(offsetRight);  // Back right
+        const v3 = new THREE.Vector3().copy(p2).add(offsetVector).sub(offsetRight);  // Front left
+        const v4 = new THREE.Vector3().copy(p2).add(offsetVector).add(offsetRight);  // Front right
+        
+        // Create geometry
+        const geometry = new THREE.BufferGeometry();
+        
+        // Define vertices
+        const vertices = new Float32Array([
+            // First triangle
+            v1.x, v1.y + 0.01, v1.z, // Raise slightly above road to prevent z-fighting
+            v2.x, v2.y + 0.01, v2.z,
+            v3.x, v3.y + 0.01, v3.z,
+            
+            // Second triangle
+            v2.x, v2.y + 0.01, v2.z,
+            v4.x, v4.y + 0.01, v4.z,
+            v3.x, v3.y + 0.01, v3.z
+        ]);
+        
+        // Set position attribute
+        geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        
+        // Create the mesh
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        // Add to the road group
+        this.roadGroup.add(mesh);
+    }
+    
+    /**
+     * Adds barriers on the sides of the road
+     */
+    addSideBarriers(points) {
+        // Create materials for barriers
+        const leftBarrierMaterial = new THREE.MeshStandardMaterial({
+            color: 0xFF00FF, // Magenta
+            emissive: 0xFF00FF,
+            emissiveIntensity: 0.3,
+            roughness: 0.5,
+            metalness: 0.8
+        });
+        
+        const rightBarrierMaterial = new THREE.MeshStandardMaterial({
+            color: 0x00FFFF, // Cyan
+            emissive: 0x00FFFF,
+            emissiveIntensity: 0.3,
+            roughness: 0.5,
+            metalness: 0.8
+        });
+        
+        // Create barriers every few points to reduce geometry
+        const barrierInterval = 4;
+        
+        for (let i = 0; i < points.length - 1; i += barrierInterval) {
+            const p1 = points[i];
+            const p2 = points[Math.min(i + barrierInterval, points.length - 1)];
+            
+            // Create left and right barriers
+            this.addBarrier(p1, p2, this.width / 2, leftBarrierMaterial);  // Left side
+            this.addBarrier(p1, p2, -this.width / 2, rightBarrierMaterial); // Right side
+        }
+    }
+    
+    /**
+     * Adds a single barrier segment between two points
+     */
+    addBarrier(p1, p2, offset, material) {
+        // Get direction vector between the points
+        const direction = new THREE.Vector3().subVectors(p2, p1);
+        const length = direction.length();
+        direction.normalize();
+        
+        // Calculate the perpendicular vector for road width
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(direction, worldUp).normalize();
+        
+        // Calculate offset position
+        const offsetVector = right.clone().multiplyScalar(offset);
+        
+        // Create barrier geometry
+        const barrierHeight = 0.5;
+        const barrierWidth = 0.3;
+        const barrierGeometry = new THREE.BoxGeometry(barrierWidth, barrierHeight, length);
+        
+        // Create barrier mesh
+        const barrier = new THREE.Mesh(barrierGeometry, material);
+        
+        // Position barrier at midpoint between the points, offset by the road width
+        const midpoint = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+        midpoint.add(offsetVector);
+        
+        // Adjust height to sit on road
+        midpoint.y += barrierHeight / 2;
+        
+        barrier.position.copy(midpoint);
+        
+        // Orient barrier along the road
+        const lookPoint = new THREE.Vector3().addVectors(
+            midpoint,
+            direction
+        );
+        barrier.lookAt(lookPoint);
+        
+        // Add to road group
+        this.roadGroup.add(barrier);
     }
     
     /**

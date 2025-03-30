@@ -36,13 +36,15 @@ Test:
 Open the game in the browser.
 Confirm the track is visible and the player rests on it, able to move left and right along its surface.
 
-Step 5: Implement Automatic Forward Movement
+Step 5: Implement Automatic World Movement
 Instructions:
-In player.js, add a method to update the player’s position forward automatically.
-In game.js, call this method within the render loop to simulate constant forward motion.
+In track.js (or wherever your track/environment logic lives), add a method to update the track’s position so it moves towards the player automatically. For example, decrease the track’s Z-position (assuming a 3D setup) or Y-position (in a 2D top-down view) each frame.
+In game.js, call this method within the render loop to create the illusion of constant forward motion as the world approaches the player.
+Ensure that obstacles, collectibles, or other elements tied to the track move along with it, maintaining their relative positions.
 Test:
-Start the game and observe the player moving forward along the track without any key presses.
-Ensure the movement speed is consistent and smooth.
+Start the game and observe the track and its elements (like obstacles) moving towards the player without any key presses.
+Verify that the movement speed is consistent and smooth, giving the impression that the player is speeding forward through the environment.
+Check that the player can still move laterally (e.g., left and right) while the world moves, if that’s part of your design.
 
 Step 6: Add Basic Obstacles
 **�t - In src/objects, create a file named obstacle.js.

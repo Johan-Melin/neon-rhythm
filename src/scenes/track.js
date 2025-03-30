@@ -6,6 +6,10 @@ export default class Track {
         this.length = length; // Length of the track
         this.width = 7; // Width of the track
         
+        // Movement properties
+        this.speed = 0.2; // Speed at which the track moves
+        this.totalDistance = 0; // Total distance traveled
+        
         // Create the track mesh
         this.createTrack();
     }
@@ -71,6 +75,19 @@ export default class Track {
     }
     
     update() {
-        // Future functionality for track animations or movement
+        // Move the entire track group forward toward player
+        this.group.position.z += this.speed;
+        this.totalDistance += this.speed;
+        
+        // When the track has moved a certain distance, reset its position
+        // This creates the illusion of an infinite track
+        if (this.group.position.z > this.length / 2) {
+            this.group.position.z = 0;
+        }
+    }
+    
+    // Getter for total distance traveled (useful for spawning obstacles later)
+    getDistanceTraveled() {
+        return this.totalDistance;
     }
 } 

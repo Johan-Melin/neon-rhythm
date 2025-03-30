@@ -1,0 +1,34 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- You can @ files here
+- You can use markdown but dont have to
+
+Modularity Rule
+Always break down the codebase into multiple, modular files, each responsible for a distinct part of the game (e.g., separate files for game logic, rendering, input handling). Use ES6 modules to import and export functionality between files. Avoid creating a single, monolithic file that contains all the code, as this leads to maintenance challenges, debugging difficulties, and poor scalability.
+
+Scene Management Rule
+Utilize Three.js’s Scene object to organize game objects efficiently. Group related objects (e.g., player, enemies, environment) using Object3D to simplify hierarchy management and transformations, making the scene easier to manipulate and debug.
+
+Rendering Rule
+Optimize rendering performance by minimizing draw calls and leveraging techniques like frustum culling, level of detail (LOD), and batching. Ensure the render loop runs smoothly without blocking the main thread, maintaining a consistent frame rate for real-time gameplay.
+
+Physics and Collision Rule
+Implement physics and collision detection thoughtfully, either with Three.js’s built-in capabilities or external libraries like Cannon.js. Optimize collision checks to prevent frame rate drops, especially in scenes with many interactive objects.
+
+Audio Rule
+Enhance immersion with Three.js’s audio features, such as spatial audio tied to object positions. Synchronize sound effects with game events to create a cohesive and engaging player experience.
+
+User Interface Rule
+Build intuitive menus, heads-up displays (HUDs), and overlays using HTML/CSS, integrating them seamlessly with the Three.js canvas. This separation keeps UI logic distinct from game logic while ensuring a polished user experience.
+
+Game State Management Rule
+Manage game states explicitly (e.g., loading, playing, paused, game over) using a state machine approach. This provides clear control over transitions and prevents unexpected behavior during state changes.
+
+Performance Monitoring Rule
+Continuously monitor performance using tools like Three.js’s stats panel or Chrome DevTools to track frame rate and memory usage. Regularly profile the game to identify and address bottlenecks, ensuring a smooth experience across devices.

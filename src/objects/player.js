@@ -10,6 +10,7 @@ export default class Player {
         
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.position.y = 0.25; // Position slightly above the track
+        this.mesh.position.z = 0; // Position at the start of the track
         
         // Movement properties
         this.speed = 0.1;

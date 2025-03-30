@@ -1,5 +1,6 @@
 import * as THREE from '../../node_modules/three/build/three.module.js';
 import Player from '../objects/player.js';
+import Track from '../scenes/track.js';
 
 class Game {
     constructor() {
@@ -17,24 +18,21 @@ class Game {
         document.getElementById('game-container').appendChild(this.renderer.domElement);
         
         // Set up camera position
-        this.camera.position.z = 5;
-        this.camera.position.y = 2;
+        this.camera.position.z = 7; // Move camera back a bit
+        this.camera.position.y = 3; // Position camera higher
         this.camera.rotation.x = -0.3; // Tilt camera down slightly
+        
+        // Initialize track
+        this.track = new Track();
+        this.scene.add(this.track.group);
         
         // Initialize player
         this.player = new Player();
         this.scene.add(this.player.mesh);
         
-        // Add temporary ground plane for better orientation
-        const groundGeometry = new THREE.PlaneGeometry(10, 10);
-        const groundMaterial = new THREE.MeshBasicMaterial({
-            color: 0x555555,
-            side: THREE.DoubleSide
-        });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = Math.PI / 2; // Rotate to be horizontal
-        ground.position.y = 0;
-        this.scene.add(ground);
+        // Add ambient light to make materials visible
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        this.scene.add(ambientLight);
         
         // Handle window resize
         window.addEventListener('resize', () => this.onWindowResize(), false);
@@ -53,6 +51,11 @@ class Game {
         // Update player
         if (this.player) {
             this.player.update();
+        }
+        
+        // Update track
+        if (this.track) {
+            this.track.update();
         }
     }
     

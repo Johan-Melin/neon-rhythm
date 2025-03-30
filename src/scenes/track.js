@@ -1,13 +1,18 @@
 import * as THREE from '../../../node_modules/three/build/three.module.js';
 
 export default class Track {
-    constructor(length = 100) {
+    constructor(scene) {
         // Track properties
-        this.length = length; // Total length of the track
+        this.length = 400; // Total length of the track
         this.width = 7; // Width of the track
         
         // Create a group to hold all track objects
         this.group = new THREE.Group();
+        
+        // Add the group to the scene if provided
+        if (scene) {
+            scene.add(this.group);
+        }
         
         // Generate control points for the track's spline
         this.controlPoints = this.generateControlPoints();

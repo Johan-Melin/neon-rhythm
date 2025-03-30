@@ -22,17 +22,20 @@ class Game {
         this.renderer.setClearColor(0x000022); // Dark blue background
         document.getElementById('game-container').appendChild(this.renderer.domElement);
         
-        // Set up camera position for better visualization of the spline
-        this.camera.position.set(0, 50, 50); // Position camera high and back
-        this.camera.lookAt(0, 0, -150); // Look at the middle of the track
+        // Set up initial camera position
+        this.camera.position.set(0, 10, 30); // Lower and closer to see the player
+        this.camera.lookAt(0, 0, -20);
         
-        // Initialize track
-        this.track = new Track();
-        this.scene.add(this.track.group);
+        // Camera settings
+        this.cameraMode = 'follow'; // 'follow' or 'free'
+        this.cameraOffset = new THREE.Vector3(0, 5, 10); // Offset behind and above player
         
-        // Temporarily disable player for spline visualization
-        // this.player = new Player();
-        // this.scene.add(this.player.mesh);
+        // Initialize track - Pass the scene
+        this.track = new Track(this.scene);
+        
+        // Add the player - pass the track so player can follow it
+        this.player = new Player(this.track);
+        this.scene.add(this.player.mesh);
         
         // Add ambient light and directional light for better visibility
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -48,7 +51,7 @@ class Game {
         // Handle window resize
         window.addEventListener('resize', () => this.onWindowResize(), false);
         
-        // Add event listeners for speed control
+        // Add event listeners for speed control and camera
         this.setupEventListeners();
         
         // Start render loop
@@ -143,35 +146,42 @@ class Game {
                     this.regenerateTrack();
                     break;
                 
-                // Camera control for visualization
+                // Toggle camera mode with C key
+                case 'c':
+                case 'C':
+                    this.cameraMode = this.cameraMode === 'follow' ? 'free' : 'follow';
+                    if (this.cameraMode === 'free') {
+                        // Set up for free camera
+                        this.camera.position.set(0, 50, 50);
+                        this.camera.lookAt(0, 0, -150);
+                    }
+                    break;
+                
+                // Camera control for free camera mode
                 case 'q':
-                    // Move camera left
-                    this.camera.position.x -= 5;
+                    if (this.cameraMode === 'free') this.camera.position.x -= 5;
                     break;
                 case 'e':
-                    // Move camera right
-                    this.camera.position.x += 5;
+                    if (this.cameraMode === 'free') this.camera.position.x += 5;
                     break;
                 case 'r':
-                    // Move camera up
-                    this.camera.position.y += 5;
+                    if (this.cameraMode === 'free') this.camera.position.y += 5;
                     break;
                 case 'f':
-                    // Move camera down
-                    this.camera.position.y -= 5;
+                    if (this.cameraMode === 'free') this.camera.position.y -= 5;
                     break;
                 case 't':
-                    // Move camera forward
-                    this.camera.position.z -= 5;
+                    if (this.cameraMode === 'free') this.camera.position.z -= 5;
                     break;
                 case 'g':
-                    // Move camera backward
-                    this.camera.position.z += 5;
+                    if (this.cameraMode === 'free') this.camera.position.z += 5;
                     break;
             }
             
             // Update camera target and info
-            this.camera.lookAt(0, 0, -150);
+            if (this.cameraMode === 'free') {
+                this.camera.lookAt(0, 0, -150);
+            }
             this.updateCameraInfo();
             
             // Update speed display
@@ -186,8 +196,15 @@ class Game {
         }
         
         // Create a new track
-        this.track = new Track();
-        this.scene.add(this.track.group);
+        this.track = new Track(this.scene);
+        
+        // Reset player position on new track
+        if (this.player) {
+            this.player.track = this.track;
+            this.player.trackTime = 0;
+            this.player.distance = 0;
+            this.player.updatePositionOnTrack();
+        }
         
         // Update track info
         if (this.trackInfoDisplay) {
@@ -204,24 +221,48 @@ class Game {
     update() {
         if (this.isPaused) return;
         
+        // Update player
+        if (this.player) {
+            this.distance = this.player.update(this.gameSpeed);
+            this.distanceDisplay.textContent = `Distance: ${Math.floor(this.distance)}m`;
+            
+            // Update camera if in follow mode
+            if (this.cameraMode === 'follow') {
+                this.updateFollowCamera();
+            }
+        }
+        
         // Update camera info each frame
         this.updateCameraInfo();
+    }
+    
+    updateFollowCamera() {
+        if (!this.player || !this.player.mesh) return;
         
-        // Temporarily disable player update for spline visualization
-        // if (this.player) {
-        //     this.player.update();
-        // }
+        // Get player's position and rotation
+        const playerPos = this.player.mesh.position.clone();
+        const playerRotation = new THREE.Euler().copy(this.player.mesh.rotation);
         
-        // For now, we don't need to update the track - just visualize it
-        // if (this.track) {
-        //     // Apply game speed to track movement
-        //     this.track.speed = 0.2 * this.gameSpeed;
-        //     this.track.update();
-        //     
-        //     // Update distance traveled
-        //     this.distance = this.track.getDistanceTraveled();
-        //     this.distanceDisplay.textContent = `Distance: ${Math.floor(this.distance)}m`;
-        // }
+        // Use player's forward direction (based on its rotation)
+        const directionVector = new THREE.Vector3(0, 0, 1);
+        directionVector.applyEuler(playerRotation);
+        
+        // Calculate camera position - behind and above player
+        const offsetVector = new THREE.Vector3(
+            this.cameraOffset.x,
+            this.cameraOffset.y,
+            this.cameraOffset.z
+        );
+        offsetVector.applyEuler(playerRotation);
+        
+        // Set camera position
+        this.camera.position.copy(playerPos).add(offsetVector);
+        
+        // Look at a point ahead of the player
+        const lookAtVector = new THREE.Vector3(0, 0, -5);
+        lookAtVector.applyEuler(playerRotation);
+        const lookAtPos = playerPos.clone().add(lookAtVector);
+        this.camera.lookAt(lookAtPos);
     }
     
     render() {

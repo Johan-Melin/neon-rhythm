@@ -1,4 +1,5 @@
 import * as THREE from '../../node_modules/three/build/three.module.js';
+import Player from '../objects/player.js';
 
 class Game {
     constructor() {
@@ -17,12 +18,23 @@ class Game {
         
         // Set up camera position
         this.camera.position.z = 5;
+        this.camera.position.y = 2;
+        this.camera.rotation.x = -0.3; // Tilt camera down slightly
         
-        // Add a simple cube to verify the scene is working
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        this.cube = new THREE.Mesh(geometry, material);
-        this.scene.add(this.cube);
+        // Initialize player
+        this.player = new Player();
+        this.scene.add(this.player.mesh);
+        
+        // Add temporary ground plane for better orientation
+        const groundGeometry = new THREE.PlaneGeometry(10, 10);
+        const groundMaterial = new THREE.MeshBasicMaterial({
+            color: 0x555555,
+            side: THREE.DoubleSide
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = Math.PI / 2; // Rotate to be horizontal
+        ground.position.y = 0;
+        this.scene.add(ground);
         
         // Handle window resize
         window.addEventListener('resize', () => this.onWindowResize(), false);
@@ -38,11 +50,9 @@ class Game {
     }
     
     update() {
-        // Game logic update will go here
-        // Rotate the cube for visibility
-        if (this.cube) {
-            this.cube.rotation.x += 0.01;
-            this.cube.rotation.y += 0.01;
+        // Update player
+        if (this.player) {
+            this.player.update();
         }
     }
     
